@@ -35,6 +35,7 @@ import {
   Portal,
 } from 'react-native-paper';
 import {NativeModules} from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 const FilePicker = NativeModules.FileChooser;
 const styles = StyleSheet.create({
   genericInputStyle: {
@@ -50,6 +51,8 @@ const initialState = {
   showCalendar: false,
   date: '',
   fileObjects: [],
+  title: '',
+  description: '',
   options: [
     {
       key: '1',
@@ -135,7 +138,7 @@ const HomeReducer = (state = initialState, action) => {
     case 'SET_DATE':
       return {
         ...state,
-        date: action.payload,
+        date: action.payload.toISOString().split('T')[0],
         showCalendar: false,
       };
     case 'UPDATE_FILE_OBJ':
@@ -159,66 +162,22 @@ const HomeReducer = (state = initialState, action) => {
         ...state,
         fileObjects: nfiles,
       };
+
+    case 'UPDATE_TITLE':
+      return {
+        ...state,
+        title: action.payload,
+      };
+    case 'UPDATE_DESCRIPTION':
+      return {
+        ...state,
+        description: action.payload,
+      };
     default:
       return state;
   }
 };
-const CalendarView = ({dispatch, ...props}) => {
-  return (
-    <Portal>
-      <Modal visible={true}>
-        <Calendar
-          // Handler which gets executed on day press. Default = undefined
-          onDayPress={(day) => {
-            console.log('selected day', day);
-            dispatch({type: 'SET_DATE', payload: day.dateString});
-          }}
-          // Handler which gets executed on day long press. Default = undefined
-          onDayLongPress={(day) => {
-            console.log('selected day', day);
-          }}
-          // Month format in calendar title. Formatting values: http://arshaw.com/xdate/#Formatting
-          monthFormat={'yyyy MM'}
-          // Handler which gets executed when visible month changes in calendar. Default = undefined
-          onMonthChange={(month) => {
-            console.log('month changed', month);
-          }}
-          // Hide month navigation arrows. Default = false
-          //hideArrows={true}
-          // Replace default arrows with custom ones (direction can be 'left' or 'right')
-          renderArrow={(direction) => <Arrow />}
-          // Do not show days of other months in month page. Default = false
-          hideExtraDays={true}
-          // If hideArrows=false and hideExtraDays=false do not switch month when tapping on greyed out
-          // day from another month that is visible in calendar page. Default = false
-          disableMonthChange={true}
-          // If firstDay=1 week starts from Monday. Note that dayNames and dayNamesShort should still start from Sunday.
-          firstDay={1}
-          // Hide day names. Default = false
-          hideDayNames={true}
-          // Show week numbers to the left. Default = false
-          showWeekNumbers={true}
-          // Handler which gets executed when press arrow icon left. It receive a callback can go back month
-          onPressArrowLeft={(subtractMonth) => subtractMonth()}
-          // Handler which gets executed when press arrow icon right. It receive a callback can go next month
-          onPressArrowRight={(addMonth) => addMonth()}
-          // Disable left arrow. Default = false
-          disableArrowLeft={true}
-          // Disable right arrow. Default = false
-          disableArrowRight={true}
-          // Disable all touch events for disabled days. can be override with disableTouchEvent in markedDates
-          disableAllTouchEventsForDisabledDays={true}
-          // Replace default month and year title with custom one. the function receive a date as parameter.
-          renderHeader={(date) => {
-            /*Return JSX*/
-          }}
-          // Enable the option to swipe between months. Default = false
-          enableSwipeMonths={true}
-        />
-      </Modal>
-    </Portal>
-  );
-};
+
 const AssigneePage = ({redState, dispatch, ...props}) => {
   const [keyUpdate, setKeyUpdate] = React.useState('update');
   //var set = new Set();
@@ -232,10 +191,6 @@ const AssigneePage = ({redState, dispatch, ...props}) => {
           renderItem={(item) => (
             <TouchableOpacity
               onPress={() => {
-                /*var sItems = selectedItems;
-                sItems.push(item.item.key);
-                setSelectedItems(sItems);*/
-                //set.add(item.item.key);
                 dispatch({type: 'ADD_TO_SELECTED_ITEMS', payload: item.item});
                 setKeyUpdate(new Date().toISOString());
               }}>
@@ -301,8 +256,6 @@ const AssigneePage = ({redState, dispatch, ...props}) => {
 };
 
 const HomePage = ({redState, dispatch, ...props}) => {
-  const [noOfWords, setNoOfWord] = React.useState(0);
-  const [title, setTitle] = React.useState('');
 
   const callFileChooser = async () => {
     try {
@@ -337,12 +290,14 @@ const HomePage = ({redState, dispatch, ...props}) => {
           <RNTextInput
             placeholder="Title"
             style={styles.genericInputStyle}
-            value={title}
-            onChangeText={(text) => setTitle(text)}
+            value={redState.title}
+            onChangeText={(text) =>
+              dispatch({type: 'UPDATE_TITLE', payload: text})
+            }
           />
           <TouchableOpacity onPress={() => dispatch({type: 'TOGGLE_CALENDAR'})}>
             <RNTextInput
-              style={{marginTop: 20, flexWrap:'wrap'}}
+              style={{marginTop: 20, flexWrap: 'wrap'}}
               placeholder="Due Date"
               editable={false}
               value={redState.date}
@@ -387,10 +342,13 @@ const HomePage = ({redState, dispatch, ...props}) => {
 
           <Title>Description</Title>
           <RNTextInput
-            onChangeText={(text) => setNoOfWord(text.split(' ').length)}
+            onChangeText={(text) =>
+              dispatch({type: 'UPDATE_DESCRIPTION', payload: text})
+            }
             numberOfLines={5}
             style={[styles.genericInputStyle, {borderBottomWidth: 0}]}
             multiline={true}
+            value={redState.description}
           />
           <Text
             style={[
@@ -401,7 +359,7 @@ const HomePage = ({redState, dispatch, ...props}) => {
                 paddingRight: 10,
               },
             ]}>
-            Words {noOfWords}/100
+            Words {redState.description.split(' ').length}/100
           </Text>
           <View style={{flexDirection: 'row'}}>
             <Title style={{flex: 5, alignSelf: 'flex-start'}}>Attachment</Title>
@@ -471,7 +429,18 @@ const App = () => {
   const [redState, dispatch] = React.useReducer(HomeReducer, initialState);
   return (
     <View style={{flex: 1}}>
-      {redState.showCalendar && <CalendarView dispatch={dispatch} />}
+      {redState.showCalendar && (
+        <DateTimePicker
+          testID="dateTimePicker"
+          value={new Date()}
+          mode={'date'}
+          is24Hour={true}
+          display="default"
+          onChange={(event, selectedDate) => {
+            dispatch({type: 'SET_DATE', payload: selectedDate});
+          }}
+        />
+      )}
       <Appbar.Header>
         <Appbar.Content
           title={redState.page === 0 ? 'Create  task' : 'Assign employee'}
